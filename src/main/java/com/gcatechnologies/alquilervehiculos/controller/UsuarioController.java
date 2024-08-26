@@ -29,7 +29,7 @@ public class UsuarioController {
     @PostMapping("/nueva")
     public ResponseEntity<MensajeDTO> agregarUsuario(@RequestBody Usuario usuario) {
         if (usuario.getNombre() == null || usuario.getNombrePila() == null || usuario.getApellido() == null
-                || usuario.getCedula() == null || usuario.getContrasena() == null){
+                || usuario.getCedula() == null || usuario.getContrasena() == null || usuario.getCorreo() == null){
             MensajeDTO errorResponse = new MensajeDTO(
                     "Datos del usuario son inválidos. Por favor, asegúrate de completar todos los campos necesarios.",
                     HttpStatus.BAD_REQUEST
@@ -57,19 +57,20 @@ public class UsuarioController {
 
     @GetMapping("/buscar/{idUsuario}")
     public ResponseEntity<UsuarioDTO> obtenerUsuario(@PathVariable Long idUsuario) {
-        if (idUsuario == null ) {
-            return ResponseEntity.badRequest().build();//400
+        if (idUsuario == null) {
+            return ResponseEntity.badRequest().build(); // 400 Bad Request
         }
         try {
             UsuarioDTO usuario = usuarioService.buscarUsuarioDTO(idUsuario);
-            if (usuario == null) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-            }
             return ResponseEntity.ok(usuario);
-
+        } catch (EntityNotFoundException e) {
+             return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .header("Error-Message", "Usuario no encontrado.")
+                    .body(null);
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
+
     }
 
     @DeleteMapping("/eliminar/{idUsuario}")

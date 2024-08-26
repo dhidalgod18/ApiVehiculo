@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 
 
 import java.util.List;
+import java.util.regex.Pattern;
 
 @RestController
 @RequestMapping("tarjeta")
@@ -33,7 +34,7 @@ public class TarjetaController {
     }
     @PostMapping("/nueva")
     public ResponseEntity<MensajeDTO> agregarTarjeta(@RequestBody Tarjeta tarjeta) {
-        if (tarjeta.getNumeroTarjeta() == null || tarjeta.getCodigo() == null ||
+        if (tarjeta.getMedioPago() == null ||tarjeta.getUsuario() == null || tarjeta.getNumeroTarjeta() == null || tarjeta.getCodigo() == null ||
                 tarjeta.getFechaExpiracion() == null || tarjeta.getUsuario().getId() == null ||
                 tarjeta.getMedioPago().getIdMedioPago() == null) {
             MensajeDTO errorResponse = new MensajeDTO(
@@ -42,29 +43,59 @@ public class TarjetaController {
             );
             return ResponseEntity.badRequest().body(errorResponse);
         }
+        Pattern numericPattern = Pattern.compile("\\d+");
+        if (!numericPattern.matcher(tarjeta.getNumeroTarjeta()).matches() ||
+                !numericPattern.matcher(tarjeta.getCodigo()).matches()) {
+            MensajeDTO errorResponse = new MensajeDTO(
+                    "El número de tarjeta y el código solo pueden contener dígitos.",
+                    HttpStatus.BAD_REQUEST
+            );
+            return ResponseEntity.badRequest().body(errorResponse);
+        }
+
+        String fechaExpiracion = tarjeta.getFechaExpiracion();
+        Pattern fechaPattern = Pattern.compile("^(0[1-9]|1[0-2])/\\d{2}$");
+        if (!fechaPattern.matcher(fechaExpiracion).matches()) {
+            MensajeDTO errorResponse = new MensajeDTO(
+                    "El formato de la fecha de expiración debe ser MM/yy.",
+                    HttpStatus.BAD_REQUEST
+            );
+            return ResponseEntity.badRequest().body(errorResponse);
+        }
+
+
         Usuario usuario = usuarioService.buscarUsuario(tarjeta.getUsuario().getId());
         MedioPago medioPago = medioPagoService.buscarMedioId(tarjeta.getMedioPago().getIdMedioPago());
 
-        Tarjeta tarjeta1 = new Tarjeta();
-        String tarjetaEntera = tarjeta.getNumeroTarjeta();
-        String tarjetaCodificada = passwordEncoder.encode(tarjetaEntera);
-        tarjeta1.setNumeroTarjeta(tarjetaCodificada);
-        tarjeta1.setFechaExpiracion(tarjeta.getFechaExpiracion());
+        if (medioPago.getNombre().equals("Tarjeta Debido") || medioPago.getNombre().equals("Tarjeta Credito")) {
+            Tarjeta tarjeta1 = new Tarjeta();
+            String tarjetaEntera = tarjeta.getNumeroTarjeta();
+            String tarjetaCodificada = passwordEncoder.encode(tarjetaEntera);
+            tarjeta1.setNumeroTarjeta(tarjetaCodificada);
+            tarjeta1.setFechaExpiracion(tarjeta.getFechaExpiracion());
 
-        String codigo = tarjeta.getCodigo();
-        String codigoOculto = passwordEncoder.encode(codigo);
-        tarjeta1.setCodigo(codigoOculto);
-        tarjeta1.setUsuario(usuario);
-        tarjeta1.setMedioPago(medioPago);
+            String codigo = tarjeta.getCodigo();
+            String codigoOculto = passwordEncoder.encode(codigo);
+            tarjeta1.setCodigo(codigoOculto);
+            tarjeta1.setUsuario(usuario);
+            tarjeta1.setMedioPago(medioPago);
+            tarjeta1.setIdTarjeta(tarjeta.getIdTarjeta());
 
-        tarjetaService.agregarTarjeta(tarjeta1);
-
-        MensajeDTO response = new MensajeDTO(
-                "La tarjeta ha sido registrada exitosamente.",
-                HttpStatus.OK
-        );
-        return ResponseEntity.ok(response);
+            tarjetaService.agregarTarjeta(tarjeta1);
+            MensajeDTO response = new MensajeDTO(
+                    "La tarjeta ha sido agregada exitosamente.",
+                    HttpStatus.OK
+            );
+            return ResponseEntity.ok(response);
+        }else {
+            MensajeDTO response = new MensajeDTO(
+                    "No cumple con el medio de pago correspondiente(Tarjeta Debito y/o Credito).",
+                    HttpStatus.OK
+            );
+            return ResponseEntity.ok(response);
+        }
     }
+
 
 
     @GetMapping("/todos")
@@ -73,25 +104,28 @@ public class TarjetaController {
         return ResponseEntity.ok(obtener);
     }
     @GetMapping("/buscar/{idUsuario}")
-    public ResponseEntity<TarjetaDTO> obtenerTarjeta(@PathVariable Long idUsuario) {
+    public ResponseEntity<List<TarjetaDTO>> obtenerTarjeta(@PathVariable Long idUsuario) {
         if (idUsuario == null ) {
             return ResponseEntity.badRequest().build();//400
         }
         try {
-            TarjetaDTO tarjetaDTO = tarjetaService.buscarTarjetaDTO(idUsuario);
-            if (tarjetaDTO == null) {
+            List<TarjetaDTO> obtener = tarjetaService.buscarTarjetaDTO(idUsuario);
+            if (obtener == null) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
             }
-            return ResponseEntity.ok(tarjetaDTO);
+            return ResponseEntity.ok(obtener);
 
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .header("Error-Message", "Tarjeta no encontrada para el usuario con ID.")
+                    .body(null);
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
     @PutMapping("/editar")
     public ResponseEntity<MensajeDTO> editarTarjeta(@RequestBody Tarjeta tarjeta) {
-
-        if (tarjeta.getIdTarjeta() == null || tarjeta.getNumeroTarjeta() == null || tarjeta.getCodigo() == null ||
+        if (tarjeta.getMedioPago() == null ||tarjeta.getUsuario() == null || tarjeta.getNumeroTarjeta() == null || tarjeta.getCodigo() == null ||
                 tarjeta.getFechaExpiracion() == null || tarjeta.getUsuario().getId() == null ||
                 tarjeta.getMedioPago().getIdMedioPago() == null) {
             MensajeDTO errorResponse = new MensajeDTO(
@@ -100,34 +134,62 @@ public class TarjetaController {
             );
             return ResponseEntity.badRequest().body(errorResponse);
         }
+        Pattern numericPattern = Pattern.compile("\\d+");
+        if (!numericPattern.matcher(tarjeta.getNumeroTarjeta()).matches() ||
+                !numericPattern.matcher(tarjeta.getCodigo()).matches()) {
+            MensajeDTO errorResponse = new MensajeDTO(
+                    "El número de tarjeta y el código solo pueden contener dígitos.",
+                    HttpStatus.BAD_REQUEST
+            );
+            return ResponseEntity.badRequest().body(errorResponse);
+        }
+
+        String fechaExpiracion = tarjeta.getFechaExpiracion();
+        Pattern fechaPattern = Pattern.compile("^(0[1-9]|1[0-2])/\\d{2}$");
+        if (!fechaPattern.matcher(fechaExpiracion).matches()) {
+            MensajeDTO errorResponse = new MensajeDTO(
+                    "El formato de la fecha de expiración debe ser MM/yy.",
+                    HttpStatus.BAD_REQUEST
+            );
+            return ResponseEntity.badRequest().body(errorResponse);
+        }
+
+
         Usuario usuario = usuarioService.buscarUsuario(tarjeta.getUsuario().getId());
         MedioPago medioPago = medioPagoService.buscarMedioId(tarjeta.getMedioPago().getIdMedioPago());
 
-        Tarjeta tarjeta1 = new Tarjeta();
-        String tarjetaEntera = tarjeta.getNumeroTarjeta();
-        String tarjetaCodificada = passwordEncoder.encode(tarjetaEntera);
-        tarjeta1.setNumeroTarjeta(tarjetaCodificada);
-        tarjeta1.setFechaExpiracion(tarjeta.getFechaExpiracion());
+        if (medioPago.getNombre().equals("Tarjeta Debido") || medioPago.getNombre().equals("Tarjeta Credito")) {
+            Tarjeta tarjeta1 = new Tarjeta();
+            String tarjetaEntera = tarjeta.getNumeroTarjeta();
+            String tarjetaCodificada = passwordEncoder.encode(tarjetaEntera);
+            tarjeta1.setNumeroTarjeta(tarjetaCodificada);
+            tarjeta1.setFechaExpiracion(tarjeta.getFechaExpiracion());
 
-        String codigo = tarjeta.getCodigo();
-        String codigoOculto = passwordEncoder.encode(codigo);
-        tarjeta1.setCodigo(codigoOculto);
-        tarjeta1.setUsuario(usuario);
-        tarjeta1.setMedioPago(medioPago);
-        tarjeta1.setIdTarjeta(tarjeta.getIdTarjeta());
+            String codigo = tarjeta.getCodigo();
+            String codigoOculto = passwordEncoder.encode(codigo);
+            tarjeta1.setCodigo(codigoOculto);
+            tarjeta1.setUsuario(usuario);
+            tarjeta1.setMedioPago(medioPago);
+            tarjeta1.setIdTarjeta(tarjeta.getIdTarjeta());
 
-        tarjetaService.editarTarjeta(tarjeta1);
-        MensajeDTO response = new MensajeDTO(
-                "La tarjeta ha sido modificada exitosamente.",
-                HttpStatus.OK
-        );
-        return ResponseEntity.ok(response);
+            tarjetaService.editarTarjeta(tarjeta1);
+            MensajeDTO response = new MensajeDTO(
+                    "La tarjeta ha sido agregada exitosamente.",
+                    HttpStatus.OK
+            );
+            return ResponseEntity.ok(response);
+        }else {
+            MensajeDTO response = new MensajeDTO(
+                    "No cumple con el medio de pago correspondiente(Tarjeta Debito y/o Credito).",
+                    HttpStatus.OK
+            );
+            return ResponseEntity.ok(response);
+        }
     }
 
 
-
         @DeleteMapping("/eliminar/{idTarjeta}")
-    public ResponseEntity<MensajeDTO> eliminarTarjeta(@PathVariable int idTarjeta) {
+    public ResponseEntity<MensajeDTO> eliminarTarjeta(@PathVariable Long idTarjeta) {
         try {
             tarjetaService.eliminarTarjeta(idTarjeta);
             MensajeDTO response = new MensajeDTO(

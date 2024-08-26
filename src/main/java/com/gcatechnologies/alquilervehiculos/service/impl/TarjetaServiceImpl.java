@@ -8,6 +8,7 @@ import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -30,7 +31,7 @@ public class TarjetaServiceImpl implements TarjetaService {
     }
 
     @Override
-    public boolean eliminarTarjeta(int idTarjeta) {
+    public boolean eliminarTarjeta(Long idTarjeta) {
         Optional<Tarjeta> tarjeta = tarjetaRepository.findById((long) idTarjeta);
         if (tarjeta.isPresent()){
             tarjetaRepository.deleteById((long) idTarjeta);
@@ -40,6 +41,7 @@ public class TarjetaServiceImpl implements TarjetaService {
         }
 
     }
+
 
     @Override
     public boolean editarTarjeta(Tarjeta tarjeta) {
@@ -59,18 +61,22 @@ public class TarjetaServiceImpl implements TarjetaService {
     }
 
     @Override
-    public TarjetaDTO buscarTarjetaDTO(Long idUsuario) {
-        Optional<Tarjeta> tarjetaOptional = tarjetaRepository.findByUsuarioId(idUsuario);
-        if (tarjetaOptional.isPresent()) {
-            Tarjeta tarjeta = tarjetaOptional.get();
-            return new TarjetaDTO(
+    public List<TarjetaDTO> buscarTarjetaDTO(Long idUsuario) {
+        List<Tarjeta> tarjetas = tarjetaRepository.findByUsuarioId(idUsuario);
+        if (tarjetas.isEmpty()) {
+            throw new EntityNotFoundException("No se encontraron tarjetas para el usuario con ID: " + idUsuario);
+        }
+
+        List<TarjetaDTO> tarjetaDTOs = new ArrayList<>();
+        for (Tarjeta tarjeta : tarjetas) {
+            TarjetaDTO tarjetaDTO = new TarjetaDTO(
                     tarjeta.getUsuario().getNombre(),
                     tarjeta.getMedioPago().getNombre(),
                     tarjeta.getNumeroTarjeta()
             );
-        } else {
-            throw new EntityNotFoundException("Tarjeta no encontrada para el usuario con ID: " + idUsuario);
+            tarjetaDTOs.add(tarjetaDTO);
         }
-    }
 
+        return tarjetaDTOs;
+    }
 }

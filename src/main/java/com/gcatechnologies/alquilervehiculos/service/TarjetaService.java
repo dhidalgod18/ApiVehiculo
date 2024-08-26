@@ -10,10 +10,10 @@ public interface TarjetaService {
     Tarjeta agregarTarjeta(Tarjeta tarjeta);
     List<Tarjeta> obtenerTarjeta();
 
-    boolean eliminarTarjeta(int idTarjeta);
+    boolean eliminarTarjeta(Long idTarjeta);
 
     boolean editarTarjeta(Tarjeta tarjeta);
 
-    TarjetaDTO buscarTarjetaDTO(Long idUsuario);
+    List<TarjetaDTO> buscarTarjetaDTO(Long idUsuario);
 
 }
